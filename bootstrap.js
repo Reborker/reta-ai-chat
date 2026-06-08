@@ -1,10 +1,10 @@
 /* global Zotero, Services, MozXULElement, Components */
 
-const ADDON_ID = "zby-ai-chat@example.com";
-const PREF_API_KEY = "extensions.zbyAIChat.apiKey";
-const PREF_MODEL = "extensions.zbyAIChat.model";
-const PREF_INCLUDE_FULL_TEXT = "extensions.zbyAIChat.includeFullText";
-const PREF_API_BASE = "extensions.zbyAIChat.apiBase";
+const ADDON_ID = "reta-ai-chat@example.com";
+const PREF_API_KEY = "extensions.retaAIChat.apiKey";
+const PREF_MODEL = "extensions.retaAIChat.model";
+const PREF_INCLUDE_FULL_TEXT = "extensions.retaAIChat.includeFullText";
+const PREF_API_BASE = "extensions.retaAIChat.apiBase";
 
 let rootURIGlobal = "";
 let registeredSectionID = null;
@@ -51,9 +51,9 @@ function loadMathLibs(win) {
 
     const doc = win.document;
 
-    if (!doc.getElementById("zby-ai-katex-css")) {
+    if (!doc.getElementById("reta-ai-katex-css")) {
       const link = doc.createElementNS("http://www.w3.org/1999/xhtml", "link");
-      link.id = "zby-ai-katex-css";
+      link.id = "reta-ai-katex-css";
       link.setAttribute("rel", "stylesheet");
       link.setAttribute("href", rootURIGlobal + "lib/katex/katex.min.css");
       doc.documentElement.appendChild(link);
@@ -142,18 +142,18 @@ function shutdown() {
   }
 
   for (const win of Zotero.getMainWindows()) {
-    win.document.querySelector('[href="zby-ai-chat.ftl"]')?.remove();
+    win.document.querySelector('[href="reta-ai-chat.ftl"]')?.remove();
   }
 
   Zotero.debug("[AI Chat] shutdown");
 }
 
 function onMainWindowLoad({ window }) {
-  window.MozXULElement.insertFTLIfNeeded("zby-ai-chat.ftl");
+  window.MozXULElement.insertFTLIfNeeded("reta-ai-chat.ftl");
 }
 
 function onMainWindowUnload({ window }) {
-  window.document.querySelector('[href="zby-ai-chat.ftl"]')?.remove();
+  window.document.querySelector('[href="reta-ai-chat.ftl"]')?.remove();
 }
 
 function html(doc, tag, className) {
@@ -252,62 +252,62 @@ function renderAIChat(body, item) {
   const doc = body.ownerDocument;
   body.textContent = "";
 
-  const root = html(doc, "div", "zby-ai-chat-root");
+  const root = html(doc, "div", "reta-ai-chat-root");
   const style = html(doc, "style");
 style.textContent = `
-  .zby-ai-message-content p {
+  .reta-ai-message-content p {
     margin: 0.4em 0;
   }
 
-  .zby-ai-message-content h1,
-  .zby-ai-message-content h2,
-  .zby-ai-message-content h3,
-  .zby-ai-message-content h4 {
+  .reta-ai-message-content h1,
+  .reta-ai-message-content h2,
+  .reta-ai-message-content h3,
+  .reta-ai-message-content h4 {
     margin: 0.7em 0 0.4em;
     line-height: 1.3;
   }
 
-  .zby-ai-message-content ul,
-  .zby-ai-message-content ol {
+  .reta-ai-message-content ul,
+  .reta-ai-message-content ol {
     margin: 0.4em 0 0.4em 1.5em;
     padding-left: 1em;
   }
 
-  .zby-ai-message-content blockquote {
+  .reta-ai-message-content blockquote {
     margin: 0.6em 0;
     padding-left: 0.8em;
     border-left: 3px solid var(--fill-quinary, #ccc);
     opacity: 0.9;
   }
 
-  .zby-ai-message-content code {
+  .reta-ai-message-content code {
     font-family: monospace;
     background: var(--fill-quinary, #eee);
     padding: 1px 4px;
     border-radius: 3px;
   }
 
-  .zby-ai-message-content pre {
+  .reta-ai-message-content pre {
     overflow-x: auto;
     background: var(--fill-quinary, #eee);
     padding: 8px;
     border-radius: 6px;
   }
 
-  .zby-ai-message-content pre code {
+  .reta-ai-message-content pre code {
     background: transparent;
     padding: 0;
   }
 
-  .zby-ai-message-content table {
+  .reta-ai-message-content table {
     border-collapse: collapse;
     width: 100%;
     margin: 0.6em 0;
     font-size: 12px;
   }
 
-  .zby-ai-message-content th,
-  .zby-ai-message-content td {
+  .reta-ai-message-content th,
+  .reta-ai-message-content td {
     border: 1px solid var(--fill-quinary, #ccc);
     padding: 4px 6px;
     vertical-align: top;
@@ -483,7 +483,7 @@ function appendMessage(container, role, text) {
   }
 
   const content = html(doc, "div");
-  content.className = "zby-ai-message-content";
+  content.className = "reta-ai-message-content";
   content.style.userSelect = "text";
   content.style.setProperty("-moz-user-select", "text");
   content.style.cursor = "text";

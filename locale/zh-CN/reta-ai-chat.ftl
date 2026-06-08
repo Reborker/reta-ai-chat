@@ -1,0 +1,1 @@
+reta-ai-chat-header = AI 助手

@@ -1,1 +1,0 @@
-zby-ai-chat-header = AI Assistant

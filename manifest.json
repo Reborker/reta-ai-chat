@@ -1,0 +1,21 @@
+{
+  "manifest_version": 2,
+  "name": "AI Chat",
+  "version": "0.1.0",
+  "description": "AI chat sidebar for current Zotero item",
+  "author": "ZBY",
+  "icons": {
+    "48": "icons/ai.svg"
+  },
+  "applications": {
+    "zotero": {
+      "id": "reta-ai-chat@example.com",
+      "update_url": "https://example.com/zby-ai-chat/updates.json",
+      "strict_min_version": "7.0",
+      "strict_max_version": "7.*"
+    }
+  },
+  "permissions": [
+    "https://api.deepseek.com/*"
+  ]
+}

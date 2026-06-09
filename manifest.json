@@ -3,16 +3,16 @@
   "name": "AI Chat",
   "version": "0.1.0",
   "description": "AI chat sidebar for current Zotero item",
-  "author": "ZBY",
+  "author": "zhou",
   "icons": {
-    "48": "icons/ai.svg"
+    "48": "icons/ai-20.svg"
   },
   "applications": {
     "zotero": {
       "id": "reta-ai-chat@example.com",
       "update_url": "https://example.com/zby-ai-chat/updates.json",
       "strict_min_version": "7.0",
-      "strict_max_version": "7.*"
+      "strict_max_version": "9.0.*"
     }
   },
   "permissions": [

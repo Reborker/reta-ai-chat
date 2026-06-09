@@ -5,6 +5,15 @@ const PREF_API_KEY = "extensions.retaAIChat.apiKey";
 const PREF_MODEL = "extensions.retaAIChat.model";
 const PREF_INCLUDE_FULL_TEXT = "extensions.retaAIChat.includeFullText";
 const PREF_API_BASE = "extensions.retaAIChat.apiBase";
+const PREF_PDF_MAX_CHARS = "extensions.retaAIChat.pdfMaxChars";
+const PREF_MAX_TOKENS = "extensions.retaAIChat.maxTokens";
+
+const DEFAULT_PDF_MAX_CHARS = 120000;
+const DEFAULT_MAX_TOKENS = 3000;
+const MIN_PDF_MAX_CHARS = 1000;
+const MAX_PDF_MAX_CHARS = 1000000;
+const MIN_MAX_TOKENS = 100;
+const MAX_MAX_TOKENS = 64000;
 
 let rootURIGlobal = "";
 let registeredSectionID = null;
@@ -160,6 +169,38 @@ function html(doc, tag, className) {
   const el = doc.createElementNS("http://www.w3.org/1999/xhtml", tag);
   if (className) el.className = className;
   return el;
+}
+
+function clampInt(value, defaultValue, min, max) {
+  const parsed = parseInt(value, 10);
+
+  if (!Number.isFinite(parsed)) {
+    return defaultValue;
+  }
+
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function getIntPref(prefName, defaultValue, min, max) {
+  return clampInt(Zotero.Prefs.get(prefName), defaultValue, min, max);
+}
+
+function getPDFMaxChars() {
+  return getIntPref(
+    PREF_PDF_MAX_CHARS,
+    DEFAULT_PDF_MAX_CHARS,
+    MIN_PDF_MAX_CHARS,
+    MAX_PDF_MAX_CHARS
+  );
+}
+
+function getMaxTokens() {
+  return getIntPref(
+    PREF_MAX_TOKENS,
+    DEFAULT_MAX_TOKENS,
+    MIN_MAX_TOKENS,
+    MAX_MAX_TOKENS
+  );
 }
 
 function renderMarkdown(doc, markdownText) {
@@ -373,7 +414,7 @@ style.textContent = `
   messages.style.border = "1px solid var(--fill-quinary, #ddd)";
   messages.style.borderRadius = "6px";
   messages.style.padding = "8px";
-  messages.style.minHeight = "160px";
+  messages.style.minHeight = "650px";
   messages.style.maxHeight = "300px";
   messages.style.overflowY = "auto";
   messages.style.whiteSpace = "pre-wrap";
@@ -514,6 +555,28 @@ function openSettingsDialog(win) {
     "text"
   );
 
+  const pdfMaxCharsInput = createSettingsInput(
+  doc,
+  "PDF 最大发送字符数",
+  "例如：120000",
+  String(getPDFMaxChars()),
+  "number"
+  );
+  pdfMaxCharsInput.input.min = String(MIN_PDF_MAX_CHARS);
+  pdfMaxCharsInput.input.max = String(MAX_PDF_MAX_CHARS);
+  pdfMaxCharsInput.input.step = "1000";
+
+  const maxTokensInput = createSettingsInput(
+    doc,
+    "最大输出 Token 数",
+    "例如：3000",
+    String(getMaxTokens()),
+    "number"
+  );
+  maxTokensInput.input.min = String(MIN_MAX_TOKENS);
+  maxTokensInput.input.max = String(MAX_MAX_TOKENS);
+  maxTokensInput.input.step = "100";
+
   const buttonRow = html(doc, "div");
   buttonRow.style.display = "flex";
   buttonRow.style.justifyContent = "flex-end";
@@ -528,13 +591,27 @@ function openSettingsDialog(win) {
   const saveButton = html(doc, "button");
   saveButton.textContent = "保存";
   saveButton.addEventListener("click", () => {
-    const apiBase = apiBaseInput.input.value.trim() || "https://api.deepseek.com";
-    const apiKey = apiKeyInput.input.value.trim();
-    const model = modelInput.input.value.trim() || "deepseek-v4-pro";
+  const apiBase = apiBaseInput.input.value.trim() || "https://api.deepseek.com";
+  const apiKey = apiKeyInput.input.value.trim();
+  const model = modelInput.input.value.trim() || "deepseek-v4-pro";
+  const pdfMaxChars = clampInt(
+    pdfMaxCharsInput.input.value,
+    DEFAULT_PDF_MAX_CHARS,
+    MIN_PDF_MAX_CHARS,
+    MAX_PDF_MAX_CHARS
+  );
+  const maxTokens = clampInt(
+    maxTokensInput.input.value,
+    DEFAULT_MAX_TOKENS,
+    MIN_MAX_TOKENS,
+    MAX_MAX_TOKENS
+  );
 
-    Zotero.Prefs.set(PREF_API_BASE, normalizeApiBase(apiBase));
-    Zotero.Prefs.set(PREF_API_KEY, apiKey);
-    Zotero.Prefs.set(PREF_MODEL, model);
+  Zotero.Prefs.set(PREF_API_BASE, normalizeApiBase(apiBase));
+  Zotero.Prefs.set(PREF_API_KEY, apiKey);
+  Zotero.Prefs.set(PREF_MODEL, model);
+  Zotero.Prefs.set(PREF_PDF_MAX_CHARS, pdfMaxChars);
+  Zotero.Prefs.set(PREF_MAX_TOKENS, maxTokens);
 
     overlay.remove();
 
@@ -549,6 +626,8 @@ function openSettingsDialog(win) {
   dialog.appendChild(apiBaseInput.root);
   dialog.appendChild(apiKeyInput.root);
   dialog.appendChild(modelInput.root);
+  dialog.appendChild(pdfMaxCharsInput.root);
+  dialog.appendChild(maxTokensInput.root);
   dialog.appendChild(buttonRow);
 
   overlay.appendChild(dialog);
@@ -706,7 +785,8 @@ async function buildContextFromItem(item, question) {
   const fullText = await getAttachmentFullText(item);
 
   if (fullText) {
-    const result = cleanAndLimitPDFText(fullText, 120000);
+    const pdfMaxChars = getPDFMaxChars();
+    const result = cleanAndLimitPDFText(fullText, pdfMaxChars);
 
     pdfPart = [
       "",
@@ -796,7 +876,7 @@ async function getAttachmentFullText(item) {
   return parts.join("\n\n");
 }
 
-function cleanAndLimitPDFText(text, maxChars = 120000) {
+function cleanAndLimitPDFText(text, maxChars = DEFAULT_PDF_MAX_CHARS) {
   const clean = String(text || "")
     .replace(/\r/g, "\n")
     .replace(/[ \t]+/g, " ")
@@ -1101,6 +1181,7 @@ async function askAI(question, context) {
     Zotero.Prefs.get(PREF_API_BASE) || "https://api.deepseek.com"
   );
   const model = Zotero.Prefs.get(PREF_MODEL) || "deepseek-v4-pro";
+  const maxTokens = getMaxTokens();
 
   if (!apiKey) {
     throw new Error("请先填写 API Key。");
@@ -1152,7 +1233,7 @@ async function askAI(question, context) {
         }
       ],
       temperature: 0.3,
-      max_tokens: 3000,
+      max_tokens: maxTokens,
       stream: false
     })
   });

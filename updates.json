@@ -3,7 +3,7 @@
     "reta-ai-chat@euclpts.com": {
       "updates": [
         {
-          "version": "1.0.0",
+          "version": "1.0.1",
           "update_link": "https://github.com/Reborker/reta-ai-chat/releases/download/v1.0.1/reta-chat-1.0.1.xpi",
           "applications": {
             "zotero": {

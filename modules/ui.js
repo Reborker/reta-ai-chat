@@ -123,13 +123,14 @@ style.textContent = `
 
   const messages = html(doc, "div");
   messages.style.border = "1px solid var(--fill-quinary, #ddd)";
-  messages.style.borderRadius = "6px";
-  messages.style.padding = "8px";
+  messages.style.borderRadius = "10px";
+  messages.style.padding = "12px";
   messages.style.minHeight = "650px";
-  messages.style.maxHeight = "300px";
+  messages.style.maxHeight = "650px";
   messages.style.overflowY = "auto";
-  messages.style.whiteSpace = "pre-wrap";
+  messages.style.whiteSpace = "normal";
   messages.style.fontSize = "13px";
+  messages.style.background = "var(--material-background, #f5f5f5)";
 
   messages.style.userSelect = "text";
   messages.style.setProperty("-moz-user-select", "text");
@@ -199,39 +200,103 @@ textarea.addEventListener("keydown", async (event) => {
 function appendMessage(container, role, text) {
   const doc = container.ownerDocument;
 
+  const isUser = role === "你";
+  const isAI = role === "AI";
+  const isError = role === "错误";
+
+  /*
+   * 每条消息占一整行。
+   * 用户消息靠右，AI 消息靠左。
+   */
+  const row = html(doc, "div");
+  row.style.display = "flex";
+  row.style.justifyContent = isUser ? "flex-end" : "flex-start";
+  row.style.marginBottom = "12px";
+  row.style.width = "100%";
+
+  /*
+   * 消息整体区域，包含角色名、复制按钮和气泡。
+   */
   const block = html(doc, "div");
-  block.style.marginBottom = "10px";
-  block.style.padding = "8px";
-  block.style.borderRadius = "6px";
-  block.style.lineHeight = "1.6";
+  block.style.display = "flex";
+  block.style.flexDirection = "column";
+  block.style.alignItems = isUser ? "flex-end" : "flex-start";
+  block.style.maxWidth = "86%";
   block.style.userSelect = "text";
   block.style.setProperty("-moz-user-select", "text");
   block.style.cursor = "text";
 
+  /*
+   * 顶部角色栏。
+   */
   const header = html(doc, "div");
   header.style.display = "flex";
-  header.style.justifyContent = "space-between";
+  header.style.justifyContent = isUser ? "flex-end" : "space-between";
   header.style.alignItems = "center";
-  header.style.marginBottom = "6px";
+  header.style.gap = "8px";
+  header.style.marginBottom = "4px";
+  header.style.fontSize = "11px";
+  header.style.opacity = "0.75";
+  header.style.width = "100%";
 
-  const roleEl = html(doc, "strong");
+  const roleEl = html(doc, "span");
   roleEl.textContent = role;
 
-  header.appendChild(roleEl);
+  if (isUser) {
+    header.appendChild(roleEl);
+  } else {
+    header.appendChild(roleEl);
 
-  if (role === "AI") {
-    const copyBtn = html(doc, "button");
-    copyBtn.textContent = "复制";
-    copyBtn.style.fontSize = "12px";
-    copyBtn.addEventListener("click", async () => {
-      await copyTextToClipboard(text);
-      copyBtn.textContent = "已复制";
-      setTimeout(() => {
-        copyBtn.textContent = "复制";
-      }, 1200);
-    });
+    if (isAI) {
+      const copyBtn = html(doc, "button");
+      copyBtn.textContent = "复制";
+      copyBtn.style.fontSize = "11px";
+      copyBtn.style.padding = "1px 6px";
+      copyBtn.addEventListener("click", async () => {
+        await copyTextToClipboard(text);
+        copyBtn.textContent = "已复制";
+        setTimeout(() => {
+          copyBtn.textContent = "复制";
+        }, 1200);
+      });
 
-    header.appendChild(copyBtn);
+      header.appendChild(copyBtn);
+    }
+  }
+
+  /*
+   * 真正的聊天气泡。
+   */
+  const bubble = html(doc, "div");
+  bubble.style.borderRadius = isUser
+    ? "14px 14px 4px 14px"
+    : "14px 14px 14px 4px";
+  bubble.style.padding = "8px 10px";
+  bubble.style.lineHeight = "1.6";
+  bubble.style.boxShadow = "0 1px 2px rgba(0, 0, 0, 0.08)";
+  bubble.style.wordBreak = "break-word";
+  bubble.style.overflowWrap = "anywhere";
+  bubble.style.userSelect = "text";
+  bubble.style.setProperty("-moz-user-select", "text");
+  bubble.style.cursor = "text";
+
+  if (isUser) {
+    /*
+     * 类似微信的用户绿色气泡。
+     */
+    bubble.style.background = "#95ec69";
+    bubble.style.color = "#111";
+  } else if (isError) {
+    bubble.style.background = "#ffe8e8";
+    bubble.style.color = "#a40000";
+    bubble.style.border = "1px solid #ffb8b8";
+  } else {
+    /*
+     * AI 灰色气泡。
+     */
+    bubble.style.background = "#EEEEF0";
+    bubble.style.color = "var(--fill-primary, #111)";
+    bubble.style.border = "1px solid #DDDDDF";
   }
 
   const content = html(doc, "div");
@@ -240,25 +305,25 @@ function appendMessage(container, role, text) {
   content.style.setProperty("-moz-user-select", "text");
   content.style.cursor = "text";
 
-  if (role === "AI") {
+  if (isAI) {
     content.innerHTML = renderMarkdown(doc, text);
 
-    // 让链接更安全
     for (const link of content.querySelectorAll("a")) {
       link.setAttribute("target", "_blank");
       link.setAttribute("rel", "noopener noreferrer");
     }
 
-    // 渲染 LaTeX 公式
     renderMath(content);
   } else {
     content.textContent = text;
     content.style.whiteSpace = "pre-wrap";
   }
 
+  bubble.appendChild(content);
   block.appendChild(header);
-  block.appendChild(content);
+  block.appendChild(bubble);
+  row.appendChild(block);
 
-  container.appendChild(block);
+  container.appendChild(row);
   container.scrollTop = container.scrollHeight;
 }

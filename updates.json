@@ -4,7 +4,7 @@
       "updates": [
         {
           "version": "1.0.0",
-          "update_link": "https://github.com/Reborker/reta-ai-chat/releases/download/v1.0.0/reta-chat-1.0.0.xpi",
+          "update_link": "https://github.com/Reborker/reta-ai-chat/releases/download/v1.0.0/reta-chat-1.0.1.xpi",
           "applications": {
             "zotero": {
               "strict_min_version": "7.0",

@@ -1,6 +1,6 @@
 /* global Zotero, Services, Components */
 
-var ADDON_ID = "reta-ai-chat@example.com";
+var ADDON_ID = "reta-ai-chat@euclpts.com.xpi";
 var PREF_API_KEY = "extensions.retaAIChat.apiKey";
 var PREF_MODEL = "extensions.retaAIChat.model";
 var PREF_INCLUDE_FULL_TEXT = "extensions.retaAIChat.includeFullText";

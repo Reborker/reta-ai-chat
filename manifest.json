@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "name": "AI Chat",
+  "name": "Reta AI Chat",
   "version": "1.0.0",
   "description": "AI chat sidebar for current Zotero item",
   "author": "zhou",

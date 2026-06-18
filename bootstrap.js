@@ -19,6 +19,7 @@ function loadModules() {
     "modules/markdown.js",
     "modules/settings.js",
     "modules/context.js",
+    "modules/history.js",
     "modules/api.js",
     "modules/ui.js"
   ].forEach(loadModule);

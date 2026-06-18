@@ -1,7 +1,8 @@
-/* global Zotero, html, openSettingsDialog, PREF_INCLUDE_FULL_TEXT, buildContextFromItem, askAI, renderMarkdown, renderMath, copyTextToClipboard */
+/* global Zotero, html, openSettingsDialog, PREF_INCLUDE_FULL_TEXT, buildContextFromItem, askAIStream, renderMarkdown, renderMath, copyTextToClipboard, createEmptyItemChatData, loadItemChatData, saveItemChatData, createChatSession, createSessionTitle, createChatMessage, getRecentMessagesForPrompt */
 
 function renderAIChat(body, item) {
   const doc = body.ownerDocument;
+  const win = doc.defaultView;
   body.textContent = "";
 
   const root = html(doc, "div", "reta-ai-chat-root");
@@ -66,6 +67,7 @@ style.textContent = `
   }
 `;
 
+
   root.appendChild(style);
   root.style.display = "flex";
   root.style.flexDirection = "column";
@@ -77,12 +79,29 @@ style.textContent = `
   status.style.fontSize = "12px";
   status.style.opacity = "0.8";
 
-  if (!item || !item.isRegularItem()) {
-    status.textContent = "请选择一篇普通文献条目。";
-    root.appendChild(status);
-    body.appendChild(root);
-    return;
+  if (!item || (!item.isRegularItem() && !isSupportedStandaloneAttachment(item))) {
+  status.textContent = "请选择一篇普通文献条目，或选择一个 PDF/HTML 附件。";
+  root.appendChild(status);
+  body.appendChild(root);
+  return;
   }
+
+function isSupportedStandaloneAttachment(item) {
+  return !!(
+    item &&
+    item.isAttachment &&
+    item.isAttachment() &&
+    (
+      item.attachmentContentType === "application/pdf" ||
+      item.attachmentContentType === "text/html"
+    )
+  );
+  }
+
+  let chatData = createEmptyItemChatData(item);
+  let currentSession = null;
+  let historyReady = false;
+  let isGenerating = false;
 
   const topBar = html(doc, "div");
   topBar.style.display = "flex";
@@ -106,7 +125,27 @@ style.textContent = `
   topBar.appendChild(statusWrap);
   topBar.appendChild(settingsButton);
 
+  const historyBar = html(doc, "div");
+  historyBar.style.display = "flex";
+  historyBar.style.gap = "6px";
+  historyBar.style.alignItems = "center";
 
+  const sessionSelect = html(doc, "select");
+  sessionSelect.style.flex = "1";
+  sessionSelect.style.minWidth = "0";
+  sessionSelect.style.fontSize = "12px";
+
+  const newChatButton = html(doc, "button");
+  newChatButton.textContent = "新对话";
+  newChatButton.style.fontSize = "12px";
+
+  const deleteChatButton = html(doc, "button");
+  deleteChatButton.textContent = "删除";
+  deleteChatButton.style.fontSize = "12px";
+
+  historyBar.appendChild(sessionSelect);
+  historyBar.appendChild(newChatButton);
+  historyBar.appendChild(deleteChatButton);
 
   const includeFullTextLabel = html(doc, "label");
   includeFullTextLabel.style.fontSize = "12px";
@@ -143,70 +182,302 @@ style.textContent = `
   textarea.style.boxSizing = "border-box";
 
   const button = html(doc, "button");
-  button.textContent = "发送";
+  button.textContent = "加载历史...";
   button.style.alignSelf = "flex-end";
+  button.disabled = true;
+
+  function updateHistoryControls() {
+    const hasSessions = !!(chatData && chatData.sessions && chatData.sessions.length);
+    sessionSelect.disabled = !historyReady || isGenerating || !hasSessions;
+    newChatButton.disabled = !historyReady || isGenerating;
+    deleteChatButton.disabled = !historyReady || isGenerating || !currentSession;
+  }
+
+  function renderSessionList() {
+    sessionSelect.textContent = "";
+
+    const sessions = chatData.sessions || [];
+
+    if (!sessions.length) {
+      const option = html(doc, "option");
+      option.value = "";
+      option.textContent = "无历史对话";
+      sessionSelect.appendChild(option);
+      currentSession = null;
+      updateHistoryControls();
+      return;
+    }
+
+    for (const session of sessions) {
+      const option = html(doc, "option");
+      option.value = session.id;
+      option.textContent = session.title || "未命名对话";
+
+      if (currentSession && session.id === currentSession.id) {
+        option.selected = true;
+      }
+
+      sessionSelect.appendChild(option);
+    }
+
+    updateHistoryControls();
+  }
+
+  function renderCurrentSessionMessages() {
+    messages.textContent = "";
+
+    if (!currentSession) {
+      const empty = html(doc, "div");
+      empty.textContent = "暂无历史对话。点击“新对话”或直接输入问题开始。";
+      empty.style.fontSize = "12px";
+      empty.style.opacity = "0.7";
+      messages.appendChild(empty);
+      return;
+    }
+
+    for (const msg of currentSession.messages || []) {
+      if (msg.role === "user") {
+        appendMessage(messages, "你", msg.content);
+      } else if (msg.role === "assistant") {
+        appendMessage(messages, "AI", msg.content);
+      }
+    }
+  }
+
+  function getCurrentSessionID() {
+  return currentSession ? currentSession.id : "";
+  }
+
+function rebindCurrentSession(sessionID) {
+  if (!sessionID) {
+    currentSession = null;
+    return;
+  }
+
+  currentSession = (chatData.sessions || []).find(session => session.id === sessionID) || null;
+  }
+
+  async function saveAndRebindCurrentSession() {
+  const sessionID = getCurrentSessionID();
+
+  chatData = await saveItemChatData(item, chatData);
+
+  rebindCurrentSession(sessionID);
+
+  return currentSession;
+  }
+
+  async function initHistory() {
+    try {
+      chatData = await loadItemChatData(item);
+      currentSession = chatData.sessions[0] || null;
+      renderSessionList();
+      renderCurrentSessionMessages();
+    } catch (err) {
+      messages.textContent = "";
+      appendMessage(messages, "错误", `读取历史对话失败：${err.message || String(err)}`);
+      Zotero.debug(`[AI Chat] load history failed: ${err.stack || err}`);
+    } finally {
+      historyReady = true;
+      button.disabled = false;
+      button.textContent = "发送";
+      updateHistoryControls();
+    }
+  }
+
+  async function startNewChat() {
+    if (!historyReady || isGenerating) return;
+
+    if (currentSession && (!currentSession.messages || !currentSession.messages.length)) {
+      renderCurrentSessionMessages();
+      textarea.focus();
+      return;
+    }
+
+    currentSession = createChatSession();
+    chatData.sessions.unshift(currentSession);
+
+    await saveAndRebindCurrentSession();
+
+    renderSessionList();
+    renderCurrentSessionMessages();
+    textarea.focus();
+  }
+
+  async function deleteCurrentChat() {
+    if (!historyReady || isGenerating || !currentSession) return;
+
+    const ok = win.confirm("确定删除当前历史对话吗？");
+    if (!ok) return;
+
+    const deletingID = currentSession.id;
+    chatData.sessions = (chatData.sessions || []).filter(session => session.id !== deletingID);
+    currentSession = chatData.sessions[0] || null;
+
+    await saveAndRebindCurrentSession();
+
+    renderSessionList();
+    renderCurrentSessionMessages();
+    textarea.focus();
+  }
+
+  sessionSelect.addEventListener("change", () => {
+    const sessionID = sessionSelect.value;
+    currentSession = (chatData.sessions || []).find(session => session.id === sessionID) || null;
+    renderSessionList();
+    renderCurrentSessionMessages();
+  });
+
+  newChatButton.addEventListener("click", () => {
+    startNewChat().catch(err => {
+      appendMessage(messages, "错误", err.message || String(err));
+      Zotero.debug(`[AI Chat] new chat failed: ${err.stack || err}`);
+    });
+  });
+
+  deleteChatButton.addEventListener("click", () => {
+    deleteCurrentChat().catch(err => {
+      appendMessage(messages, "错误", err.message || String(err));
+      Zotero.debug(`[AI Chat] delete chat failed: ${err.stack || err}`);
+    });
+  });
 
   async function sendQuestion() {
   const question = textarea.value.trim();
-  if (!question || button.disabled) return;
+  if (!question || button.disabled || isGenerating) return;
+
+  if (!historyReady) {
+    appendMessage(messages, "错误", "历史记录尚未加载完成，请稍后再试。");
+    return;
+  }
+
+  if (!currentSession) {
+    currentSession = createChatSession(question);
+    chatData.sessions.unshift(currentSession);
+  }
+
+  const sessionID = currentSession.id;
+
+  if (!currentSession.messages || !currentSession.messages.length) {
+    currentSession.title = createSessionTitle(question);
+  }
+
+  /*
+   * 注意：previousMessages 必须在 push 当前问题之前获取，
+   * 否则当前问题会重复传给模型。
+   */
+  const previousMessages = getRecentMessagesForPrompt(currentSession.messages || []);
+
+  const userMessage = createChatMessage("user", question);
+  currentSession.messages.push(userMessage);
+  currentSession.updatedAt = new Date().toISOString();
 
   appendMessage(messages, "你", question);
   textarea.value = "";
 
+  renderSessionList();
+
   const streamingAI = appendStreamingAIMessage(messages);
 
+  isGenerating = true;
   button.disabled = true;
   textarea.disabled = true;
   button.textContent = "读取文献...";
+  updateHistoryControls();
 
   try {
+    /*
+     * 这里保存用户问题后，必须重新绑定 currentSession。
+     */
+    await saveAndRebindCurrentSession();
+
+    if (!currentSession) {
+      throw new Error("保存用户问题后，无法重新定位当前会话。");
+    }
+
     const context = await buildContextFromItem(item, question);
 
     button.textContent = "生成中...";
 
     let fullAnswer = "";
 
-    fullAnswer = await askAIStream(question, context, (delta, text) => {
+    fullAnswer = await askAIStream(question, context, previousMessages, (delta, text) => {
       fullAnswer = text;
       streamingAI.update(fullAnswer, false);
     });
 
-    streamingAI.update(fullAnswer || "（没有收到模型输出）", true);
+    const finalAnswer = fullAnswer || "（没有收到模型输出）";
+
+    streamingAI.update(finalAnswer, true);
+
+    /*
+     * 这里一定要 push 到重新绑定后的 currentSession。
+     */
+    currentSession.messages.push(createChatMessage("assistant", finalAnswer));
+    currentSession.updatedAt = new Date().toISOString();
+
+    await saveAndRebindCurrentSession();
+
+    renderSessionList();
   } catch (err) {
+    const errorText = err.message || String(err);
+
     streamingAI.update("生成失败。", true);
-    appendMessage(messages, "错误", err.message || String(err));
+
+    if (currentSession) {
+      currentSession.messages.push(createChatMessage("assistant", `生成失败：${errorText}`));
+      currentSession.updatedAt = new Date().toISOString();
+
+      try {
+        await saveAndRebindCurrentSession();
+      } catch (saveErr) {
+        Zotero.debug(`[AI Chat] save failed after error: ${saveErr.stack || saveErr}`);
+      }
+    }
+
+    appendMessage(messages, "错误", errorText);
     Zotero.debug(`[AI Chat] ${err.stack || err}`);
   } finally {
+    /*
+     * 再保险：确保 currentSession 仍然指向 chatData.sessions 里的对象。
+     */
+    rebindCurrentSession(sessionID);
+
+    isGenerating = false;
     button.disabled = false;
     textarea.disabled = false;
     button.textContent = "发送";
+    updateHistoryControls();
     textarea.focus();
   }
 }
 
-button.addEventListener("click", sendQuestion);
-textarea.addEventListener("keydown", async (event) => {
-  if (event.key !== "Enter") return;
+  button.addEventListener("click", sendQuestion);
+  textarea.addEventListener("keydown", async (event) => {
+    if (event.key !== "Enter") return;
 
-  // Ctrl + Enter：换行
-  if (event.ctrlKey) {
-    return;
-  }
+    // Ctrl + Enter：换行
+    if (event.ctrlKey) {
+      return;
+    }
 
-  // Enter：发送
-  event.preventDefault();
-  event.stopPropagation();
+    // Enter：发送
+    event.preventDefault();
+    event.stopPropagation();
 
-  await sendQuestion();
-});
+    await sendQuestion();
+  });
 
   root.appendChild(topBar);
+  root.appendChild(historyBar);
   root.appendChild(includeFullTextLabel);
   root.appendChild(messages);
   root.appendChild(textarea);
   root.appendChild(button);
 
   body.appendChild(root);
+
+  initHistory();
 }
 
 function appendStreamingAIMessage(container) {

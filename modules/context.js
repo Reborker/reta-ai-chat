@@ -1,6 +1,9 @@
 /* global Zotero, PREF_INCLUDE_FULL_TEXT, DEFAULT_PDF_MAX_CHARS, getPDFMaxChars, countOccurrences */
 
 async function buildContextFromItem(item, question) {
+  if (item.isAttachment && item.isAttachment()) {
+  return await buildContextFromAttachment(item, question);
+  }
   const title = item.getField("title") || "";
   const abstractNote = item.getField("abstractNote") || "";
   const date = item.getField("date") || "";
@@ -74,6 +77,42 @@ ${pdfPart}
   Zotero.debug(`[AI Chat] total context chars: ${context.length}`);
 
   return context;
+}
+
+async function buildContextFromAttachment(attachment, question) {
+  const title = attachment.getField("title") || attachment.getField("filename") || "Standalone PDF";
+  const contentType = attachment.attachmentContentType || "";
+  const text = await attachment.attachmentText;
+
+  let pdfPart = "";
+
+  if (text) {
+    const pdfMaxChars = getPDFMaxChars();
+    const result = cleanAndLimitPDFText(text, pdfMaxChars);
+
+    pdfPart = [
+      "【PDF 全文】",
+      "以下内容来自当前独立 PDF 附件的全文索引。",
+      result.truncated
+        ? `【注意：PDF 全文过长，已截断。原始字符数：${result.originalLength}，发送字符数：${result.sentLength}。】`
+        : `【PDF 全文字符数：${result.sentLength}】`,
+      "",
+      result.text
+    ].join("\n");
+  } else {
+    pdfPart = [
+      "【PDF 全文】",
+      "未能读取到当前 PDF 的全文索引。可能原因：PDF 尚未索引、扫描件没有 OCR 文本、或 Zotero 尚未完成全文提取。"
+    ].join("\n");
+  }
+
+  return [
+    "【当前 Zotero 附件】",
+    `标题：${title}`,
+    `附件类型：${contentType}`,
+    "",
+    pdfPart
+  ].join("\n");
 }
 
 function getNotesText(item) {

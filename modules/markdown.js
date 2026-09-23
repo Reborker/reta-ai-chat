@@ -159,8 +159,9 @@ function renderMarkdown(doc, markdownText) {
         "code", "pre",
         "h1", "h2", "h3", "h4",
         "table", "thead", "tbody", "tr", "th", "td",
-        "a", "hr"
+        "a"
       ],
+      FORBID_TAGS: ["hr"],
       ALLOWED_ATTR: [
         "href", "title", "target", "rel"
       ]
@@ -175,8 +176,7 @@ function renderMarkdown(doc, markdownText) {
 
 function normalizeHTMLForXHTML(html) {
   return String(html || "")
-    .replace(/<br\s*>/gi, "<br/>")
-    .replace(/<hr\s*>/gi, "<hr/>");
+    .replace(/<br\s*>/gi, "<br/>");
 }
 
 function escapeHTML(text) {

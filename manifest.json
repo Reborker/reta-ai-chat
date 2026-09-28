@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Reta AI Chat",
-  "version": "1.0.3",
+  "version": "1.0.3.1",
   "description": "AI chat sidebar for current Zotero item",
   "author": "zhou",
   "icons": {
@@ -12,7 +12,7 @@
       "id": "reta-ai-chat@euclpts.com",
       "update_url": "https://raw.githubusercontent.com/Reborker/reta-ai-chat/refs/heads/main/updates.json",
       "strict_min_version": "7.0",
-      "strict_max_version": "9.0.*"
+      "strict_max_version": "15.0.*"
     }
   },
   "permissions": [
